@@ -76,8 +76,12 @@ func (r *UserRepository) Delete(ctx context.Context, id string) error {
 
 func (r *UserRepository) GetUserByID(ctx context.Context, id string) (user.User, error) {
 	result, err := r.client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName:      &r.tableName,
-		Key:            stringAttribute("id", id),
+		TableName: &r.tableName,
+		Key: map[string]types.AttributeValue{
+			"id": &types.AttributeValueMemberS{
+				Value: id,
+			},
+		},
 		ConsistentRead: aws.Bool(true),
 	})
 
@@ -100,10 +104,14 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id string) (user.User,
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (user.User, error) {
 	// GSI (email-index) を使用してメールアドレスで検索
 	result, err := r.client.Query(ctx, &dynamodb.QueryInput{
-		TableName:                 &r.tableName,
-		IndexName:                 aws.String("email-index"),
-		KeyConditionExpression:    aws.String("email = :email"),
-		ExpressionAttributeValues: stringAttribute(":email", email),
+		TableName:              &r.tableName,
+		IndexName:              aws.String("email-index"),
+		KeyConditionExpression: aws.String("email = :email"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":email": &types.AttributeValueMemberS{
+				Value: email,
+			},
+		},
 	})
 
 	if err != nil {
