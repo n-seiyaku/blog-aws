@@ -1,0 +1,23 @@
+{
+  "name": "blog-aws",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "backend": "cd backend && air",
+    "be": "pnpm backend",
+    "frontend": "pnpm --dir frontend dev",
+    "fe": "pnpm frontend",
+    "dev": "concurrently -n BACKEND,FRONTEND \"pnpm backend\" \"pnpm frontend\"",
+    "install:frontend": "pnpm --dir frontend install",
+    "install:backend": "cd backend && go mod download",
+    "install:all": "pnpm install:frontend && pnpm install:backend"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.25.0",
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

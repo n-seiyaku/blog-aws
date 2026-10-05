@@ -4,20 +4,24 @@ import (
 	"blog-aws-backend/internal/domain/user"
 	"blog-aws-backend/internal/usecase/auth"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-type AuthHandler struct {
-	loginUsecase    *auth.LoginUsecase
-	registerUsecase *auth.RegisterUsecase
-}
-
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
+}
+
+type refreshRequest struct {
+	RefreshToken string `json:"refreshToken" binding:"required"`
+}
+
+type logoutRequest struct {
+	RefreshToken string `json:"refreshToken" binding:"required"`
 }
 
 type RegisterRequest struct {
@@ -31,12 +35,23 @@ type User struct {
 	PasswordHash string
 }
 
+type AuthHandler struct {
+	loginUsecase    *auth.LoginUsecase
+	logoutUsecase   *auth.LogoutUsecase
+	refreshUsecase  *auth.RefreshUsecase
+	registerUsecase *auth.RegisterUsecase
+}
+
 func NewAuthHandler(
 	loginUsecase *auth.LoginUsecase,
+	logoutUsecase *auth.LogoutUsecase,
+	refreshUsecase *auth.RefreshUsecase,
 	registerUsecase *auth.RegisterUsecase,
 ) *AuthHandler {
 	return &AuthHandler{
 		loginUsecase:    loginUsecase,
+		logoutUsecase:   logoutUsecase,
+		refreshUsecase:  refreshUsecase,
 		registerUsecase: registerUsecase,
 	}
 }
@@ -71,7 +86,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"accessToken": result.AccessToken,
+		"accessToken":  result.AccessToken,
+		"refreshToken": result.RefreshToken,
 		"user": gin.H{
 			"id":    result.User.ID,
 			"email": result.User.Email,
@@ -117,4 +133,61 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			"email": newUser.Email,
 		},
 	})
+}
+
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	var req refreshRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message": "invalid request",
+		})
+		return
+	}
+
+	result, err := h.refreshUsecase.Execute(
+		c.Request.Context(),
+		auth.RefreshRequest{
+			RefreshToken: req.RefreshToken,
+		},
+	)
+	fmt.Println(err)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message": "invalid refresh token",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"accessToken":  result.AccessToken,
+		"refreshToken": result.RefreshToken,
+	})
+}
+
+func (h *AuthHandler) Logout(c *gin.Context) {
+	var req logoutRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "invalid request",
+		})
+		return
+	}
+
+	err := h.logoutUsecase.Execute(
+		c.Request.Context(),
+		auth.LogoutRequest{
+			RefreshToken: req.RefreshToken,
+		},
+	)
+	fmt.Println(err)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to logout",
+		})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }

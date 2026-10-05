@@ -1,10 +1,11 @@
 package post
 
 import (
-  postEntity "blog-aws-backend/internal/domain/post"
+	postEntity "blog-aws-backend/internal/domain/post"
 	"context"
 	"time"
-	"uuid"
+
+	"github.com/google/uuid"
 )
 
 type CreatePostRequest struct {
@@ -24,18 +25,23 @@ func NewPostCreateUseCase(postRepository postEntity.Repository) *PostCreateUseCa
 }
 
 func (u *PostCreateUseCase) Execute(ctx context.Context, req CreatePostRequest) (postEntity.Post, error) {
-  post := postEntity.Post{
-    ID:           uuid.NewV7().String(),
-    Title:        req.Title,
-    AuthorID:     req.AuthorID,
-    Content:      req.Content,
-    CreatedAt:    time.Now(),
-    UpdatedAt:    time.Now(),
-  }
+	postID, err := uuid.NewV7()
+	if err != nil {
+		return postEntity.Post{}, err
+	}
 
-  if err := u.postRepository.Create(ctx, post); err != nil {
-    return postEntity.Post{}, err
-  }
+	post := postEntity.Post{
+		ID:        postID.String(),
+		Title:     req.Title,
+		AuthorID:  req.AuthorID,
+		Content:   req.Content,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
 
-  return post, nil
+	if err := u.postRepository.Create(ctx, post); err != nil {
+		return postEntity.Post{}, err
+	}
+
+	return post, nil
 }
