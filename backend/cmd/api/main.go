@@ -6,6 +6,7 @@ import (
 	"blog-aws-backend/internal/infrastructure/database"
 	"blog-aws-backend/internal/infrastructure/token"
 	"blog-aws-backend/internal/usecase/auth"
+	"blog-aws-backend/internal/usecase/post"
 	"context"
 	"log"
 	"net/http"
@@ -39,6 +40,11 @@ func main() {
 		log.Fatal("DYNAMODB_SESSIONS_TABLE is required")
 	}
 
+	postTableName := os.Getenv("DYNAMODB_POSTS_TABLE")
+	if postTableName == "" {
+		log.Fatal("DYNAMODB_POSTS_TABLE is required")
+	}
+
 	// AWS config
 	cfg, err := config.LoadDefaultConfig(context.Background())
 
@@ -57,6 +63,11 @@ func main() {
 	sessionRepository := database.NewSessionRepository(
 		dynamoClient,
 		sessionTableName,
+	)
+
+	postRepository := database.NewPostRepository(
+		dynamoClient,
+		postTableName,
 	)
 
 	// JWT
@@ -86,12 +97,24 @@ func main() {
 		jwtGenerator,
 	)
 
+	createPostUsecase := post.NewCreatePostUsecase(postRepository)
+	listPostsUsecase := post.NewListPostsUsecase(postRepository)
+	deletePostUsecase := post.NewDeletePostUsecase(postRepository)
+	updatePostUsecase := post.NewUpdatePostUsecase(postRepository)
+
 	// HTTP handler
 	authHandler := handler.NewAuthHandler(
 		loginUsecase,
 		logoutUsecase,
 		refreshUsecase,
 		registerUsecase,
+	)
+
+	postHandler := handler.NewPostHandler(
+		createPostUsecase,
+		updatePostUsecase,
+		deletePostUsecase,
+		listPostsUsecase,
 	)
 
 	// Gin
@@ -111,14 +134,10 @@ func main() {
 	protect := router.Group("/")
 	protect.Use(authMiddleware.Handle())
 	{
-		protect.GET("/posts", func(ctx *gin.Context) {
-			ctx.JSON(http.StatusOK, gin.H{
-				"message": "this is protect route",
-				"role":    ctx.GetString("role"),
-				"email":   ctx.GetString("email"),
-				"userID":  ctx.GetString("userID"),
-			})
-		})
+		protect.GET("/posts", postHandler.ListPosts)
+		protect.POST("/posts", postHandler.Create)
+		protect.PUT("/posts", postHandler.Update)
+		protect.DELETE("/posts", postHandler.Delete)
 	}
 
 	router.GET("/health", func(ctx *gin.Context) {

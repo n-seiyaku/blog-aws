@@ -1,40 +1,40 @@
 package post
 
 import (
-  postEntity "blog-aws-backend/internal/domain/post"
+	"blog-aws-backend/internal/domain/post"
 	"context"
 	"time"
 )
 
 type UpdatePostRequest struct {
-  ID string
+	ID       string
 	Title    string
 	AuthorID string
 	Content  string
 }
 
-type PostUpdateUsecase struct {
-	postRepository postEntity.Repository
+type UpdatePostUsecase struct {
+	postRepository post.Repository
 }
 
-func NewPostUpdateUsecase(postRepository postEntity.Repository) *PostUpdateUsecase {
-	return &PostUpdateUsecase{
+func NewUpdatePostUsecase(postRepository post.Repository) *UpdatePostUsecase {
+	return &UpdatePostUsecase{
 		postRepository: postRepository,
 	}
 }
 
-func (u *PostUpdateUsecase) Execute(ctx context.Context, req UpdatePostRequest) (postEntity.Post, error) {
-  post := postEntity.Post{
-    ID:           req.ID,
-    Title:        req.Title,
-    AuthorID:     req.AuthorID,
-    Content:      req.Content,
-    UpdatedAt:    time.Now(),
-  }
+func (u *UpdatePostUsecase) Execute(ctx context.Context, req UpdatePostRequest) (post.Post, error) {
+	updatedPost := post.Post{
+		ID:        req.ID,
+		Title:     req.Title,
+		AuthorID:  req.AuthorID,
+		Content:   req.Content,
+		UpdatedAt: time.Now(),
+	}
 
-  if err := u.postRepository.Update(ctx, post); err != nil {
-    return postEntity.Post{}, err
-  }
+	if err := u.postRepository.Update(ctx, updatedPost); err != nil {
+		return post.Post{}, err
+	}
 
-  return post, nil
+	return updatedPost, nil
 }

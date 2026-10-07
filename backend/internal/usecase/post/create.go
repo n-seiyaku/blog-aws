@@ -1,7 +1,7 @@
 package post
 
 import (
-	postEntity "blog-aws-backend/internal/domain/post"
+	"blog-aws-backend/internal/domain/post"
 	"context"
 	"time"
 
@@ -14,23 +14,23 @@ type CreatePostRequest struct {
 	Content  string
 }
 
-type PostCreateUseCase struct {
-	postRepository postEntity.Repository
+type CreatePostUsecase struct {
+	postRepository post.Repository
 }
 
-func NewPostCreateUseCase(postRepository postEntity.Repository) *PostCreateUseCase {
-	return &PostCreateUseCase{
+func NewCreatePostUsecase(postRepository post.Repository) *CreatePostUsecase {
+	return &CreatePostUsecase{
 		postRepository: postRepository,
 	}
 }
 
-func (u *PostCreateUseCase) Execute(ctx context.Context, req CreatePostRequest) (postEntity.Post, error) {
+func (u *CreatePostUsecase) Execute(ctx context.Context, req CreatePostRequest) (post.Post, error) {
 	postID, err := uuid.NewV7()
 	if err != nil {
-		return postEntity.Post{}, err
+		return post.Post{}, err
 	}
 
-	post := postEntity.Post{
+	newPost := post.Post{
 		ID:        postID.String(),
 		Title:     req.Title,
 		AuthorID:  req.AuthorID,
@@ -39,9 +39,9 @@ func (u *PostCreateUseCase) Execute(ctx context.Context, req CreatePostRequest) 
 		UpdatedAt: time.Now(),
 	}
 
-	if err := u.postRepository.Create(ctx, post); err != nil {
-		return postEntity.Post{}, err
+	if err := u.postRepository.Create(ctx, newPost); err != nil {
+		return post.Post{}, err
 	}
 
-	return post, nil
+	return newPost, nil
 }

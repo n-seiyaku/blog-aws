@@ -6,20 +6,20 @@ import (
 	"blog-aws-backend/internal/domain/post"
 )
 
-type PostDeleteRequest struct {
+type DeletePostRequest struct {
 	ID string
 }
 
-type PostDeleteUsecase struct {
+type DeletePostUsecase struct {
 	postRepository post.Repository
 }
 
-func NewPostDeleteUsecase(postRepository post.Repository) *PostDeleteUsecase {
-	return &PostDeleteUsecase{
+func NewDeletePostUsecase(postRepository post.Repository) *DeletePostUsecase {
+	return &DeletePostUsecase{
 		postRepository: postRepository,
 	}
 }
 
-func (u *PostDeleteUsecase) Execute(ctx context.Context, req PostDeleteRequest) error {
+func (u *DeletePostUsecase) Execute(ctx context.Context, req DeletePostRequest) error {
 	return u.postRepository.Delete(ctx, req.ID)
 }

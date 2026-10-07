@@ -11,7 +11,10 @@
     "dev": "concurrently -n BACKEND,FRONTEND \"pnpm backend\" \"pnpm frontend\"",
     "install:frontend": "pnpm --dir frontend install",
     "install:backend": "cd backend && go mod download",
-    "install:all": "pnpm install:frontend && pnpm install:backend"
+    "install:all": "pnpm install:frontend && pnpm install:backend",
+    "tf:apply": "cd infra && terraform apply",
+    "tf:plan": "cd infra && terraform plan",
+    "tf:destroy": "cd infra && terraform destroy"
   },
   "keywords": [],
   "author": "",

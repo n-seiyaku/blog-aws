@@ -13,19 +13,20 @@ import (
 
 type postItem struct {
 	ID        string `dynamodbav:"id"`
+	FeedKey   string `dynamodbav:"feedKey"`
 	Title     string `dynamodbav:"title"`
-	AuthorID  string `dynamodbav:"authorId"`
 	Content   string `dynamodbav:"content"`
+	AuthorID  string `dynamodbav:"authorId"`
 	CreatedAt string `dynamodbav:"createdAt"`
 	UpdatedAt string `dynamodbav:"updatedAt"`
 }
+
+const FeedKey = "POST"
 
 type PostRepository struct {
 	client    *dynamodb.Client
 	tableName string
 }
-
-const LIMIT_POST = 10
 
 func NewPostRepository(client *dynamodb.Client, tableName string) *PostRepository {
 	return &PostRepository{
@@ -34,9 +35,10 @@ func NewPostRepository(client *dynamodb.Client, tableName string) *PostRepositor
 	}
 }
 
-func (r *PostRepository) Create(ctx context.Context, p *post.Post) error {
+func (r *PostRepository) Create(ctx context.Context, p post.Post) error {
 	item := postItem{
 		ID:        p.ID,
+		FeedKey:   FeedKey,
 		Title:     p.Title,
 		AuthorID:  p.AuthorID,
 		Content:   p.Content,
@@ -59,7 +61,7 @@ func (r *PostRepository) Create(ctx context.Context, p *post.Post) error {
 	return err
 }
 
-func (r *PostRepository) Update(ctx context.Context, p *post.Post) error {
+func (r *PostRepository) Update(ctx context.Context, p post.Post) error {
 	_, err := r.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: &r.tableName,
 		Key: map[string]types.AttributeValue{
@@ -67,11 +69,11 @@ func (r *PostRepository) Update(ctx context.Context, p *post.Post) error {
 				Value: p.ID,
 			},
 		},
-		UpdateExpression: aws.String("SET #title = :title, #content = :content, #updateAt = :updateAt"),
+		UpdateExpression: aws.String("SET #title = :title, #content = :content, #updatedAt = :updatedAt"),
 		ExpressionAttributeNames: map[string]string{
-			"#title":    "title",
-			"#content":  "content",
-			"#updateAt": "updateAt",
+			"#title":     "title",
+			"#content":   "content",
+			"#updatedAt": "updatedAt",
 		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":title": &types.AttributeValueMemberS{
@@ -84,68 +86,92 @@ func (r *PostRepository) Update(ctx context.Context, p *post.Post) error {
 				Value: p.UpdatedAt.Format(time.RFC3339),
 			},
 		},
-    ConditionExpression: aws.String("attribute_exists(id)"),
+		ConditionExpression: aws.String("attribute_exists(id)"),
 	})
 	return err
 }
 
-func (r *PostRepository) Delete(ctx context.Context, p *post.Post) error {
+func (r *PostRepository) Delete(ctx context.Context, id string) error {
 	_, err := r.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-    TableName: &r.tableName,
-    Key: map[string]types.AttributeValue{
-      "id": &types.AttributeValueMemberS{
-        Value: p.ID,
-      },
-    },
-  })
-  
-  return err
+		TableName: &r.tableName,
+		Key: map[string]types.AttributeValue{
+			"id": &types.AttributeValueMemberS{
+				Value: id,
+			},
+		},
+	})
+
+	return err
 }
 
-func (r *PostRepository) GetAll(ctx context.Context) ([]post.Post, error) {
-	items, err := r.client.Scan(ctx, &dynamodb.ScanInput{
-		TableName:            &r.tableName,
-		Limit:                aws.Int32(LIMIT_POST),
-		ProjectionExpression: aws.String("id, title, authorId, content, createdAt, updatedAt"),
-	})
+const (
+	FeedKeyPost = "POST"
+)
+
+func (r *PostRepository) ListPosts(ctx context.Context, limit int32, cursor string) ([]post.Post, string, error) {
+	lastKey, err := decodePostCursor(cursor)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-  var posts []post.Post
-  for _, item := range items.Items {
-    var p postItem
-    if err := attributevalue.UnmarshalMap(item, &p); err != nil {
-      return nil, err
-    }
+	output, err := r.client.Query(ctx, &dynamodb.QueryInput{
+		TableName:              aws.String(r.tableName),
+		IndexName:              aws.String("feedKey-createdAt-index"),
+		KeyConditionExpression: aws.String("feedKey = :feedKey"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":feedKey": &types.AttributeValueMemberS{
+				Value: FeedKeyPost,
+			},
+		},
+		Limit:             aws.Int32(limit),
+		ScanIndexForward:  aws.Bool(false),
+		ExclusiveStartKey: lastKey,
+	})
+	if err != nil {
+		return nil, "", err
+	}
 
-    post, err := parsePostItem(p)
-    if err != nil {
-      return nil, err
-    }
-    posts = append(posts, post)
-  }
+	posts := make([]post.Post, 0, len(output.Items))
+	for _, item := range output.Items {
+		var p postItem
 
-  return posts, nil
+		if err := attributevalue.UnmarshalMap(item, &p); err != nil {
+			return nil, "", err
+		}
+
+		post, err := parsePostItem(p)
+		if err != nil {
+			return nil, "", err
+		}
+
+		posts = append(posts, post)
+	}
+
+	nextCursor, err := encodePostCursor(output.LastEvaluatedKey)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return posts, nextCursor, nil
 }
 
 func parsePostItem(item postItem) (post.Post, error) {
-  createdAt, err := time.Parse(time.RFC3339, item.CreatedAt)
-  if err != nil {
-    return post.Post{}, err
-  }
+	createdAt, err := time.Parse(time.RFC3339, item.CreatedAt)
+	if err != nil {
+		return post.Post{}, err
+	}
 
-  updatedAt, err := time.Parse(time.RFC3339, item.UpdatedAt)
-  if err != nil {
-    return post.Post{}, err
-  }
+	updatedAt, err := time.Parse(time.RFC3339, item.UpdatedAt)
+	if err != nil {
+		return post.Post{}, err
+	}
 
-  return post.Post{
-    ID:        item.ID,
-    Title:     item.Title,
-    AuthorID:  item.AuthorID,
-    Content:   item.Content,
-    CreatedAt: createdAt,
-    UpdatedAt: updatedAt,
-  }, nil
+	return post.Post{
+		ID:        item.ID,
+		Title:     item.Title,
+		AuthorID:  item.AuthorID,
+		Content:   item.Content,
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
+	}, nil
 }
