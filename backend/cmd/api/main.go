@@ -136,8 +136,8 @@ func main() {
 	{
 		protect.GET("/posts", postHandler.ListPosts)
 		protect.POST("/posts", postHandler.Create)
-		protect.PUT("/posts", postHandler.Update)
-		protect.DELETE("/posts", postHandler.Delete)
+		protect.PUT("/posts/:id", postHandler.Update)
+		protect.DELETE("/posts/:id", postHandler.Delete)
 	}
 
 	router.GET("/health", func(ctx *gin.Context) {

@@ -8,7 +8,7 @@ import (
 )
 
 type LogoutRequest struct {
-	RefreshToken string `json:"refreshToken"`
+	RefreshToken string
 }
 
 type LogoutUsecase struct {

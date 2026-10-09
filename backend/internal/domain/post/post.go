@@ -7,6 +7,7 @@ type Post struct {
 	Title     string
 	AuthorID  string
 	Content   string
+	ImageURL  string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
