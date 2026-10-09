@@ -2,6 +2,7 @@ package handler
 
 import (
 	"blog-aws-backend/internal/usecase/post"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -10,19 +11,14 @@ import (
 
 type CreatePostRequest struct {
 	Title    string `json:"title" binding:"required"`
-	AuthorID string `json:"authorId" binding:"required"`
 	Content  string `json:"content" binding:"required"`
+	ImageKey string `json:"imageKey" binding:"required"`
 }
 
 type UpdatePostRequest struct {
-	ID       string `json:"id" binding:"required"`
 	Title    string `json:"title" binding:"required"`
-	AuthorID string `json:"authorId" binding:"required"`
 	Content  string `json:"content" binding:"required"`
-}
-
-type DeletePostRequest struct {
-	ID string `json:"id" binding:"required"`
+	ImageKey string `json:"imageKey" binding:"required"`
 }
 
 type PostHandler struct {
@@ -51,11 +47,14 @@ func (h *PostHandler) Create(c *gin.Context) {
 		return
 	}
 
+	userID := c.GetString("userID")
 	newPost, err := h.createUsecase.Execute(c.Request.Context(), post.CreatePostRequest{
 		Title:    req.Title,
-		AuthorID: req.AuthorID,
+		AuthorID: userID,
 		Content:  req.Content,
+		ImageKey: req.ImageKey,
 	})
+	fmt.Println("error ================================", err)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": "failed to create post",
@@ -69,6 +68,7 @@ func (h *PostHandler) Create(c *gin.Context) {
 			"title":    newPost.Title,
 			"authorId": newPost.AuthorID,
 			"content":  newPost.Content,
+			"imageKey": newPost.ImageKey,
 		},
 	})
 }
@@ -82,11 +82,21 @@ func (h *PostHandler) Update(c *gin.Context) {
 		return
 	}
 
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "invalid request",
+		})
+		return
+	}
+
+	userID := c.GetString("userID")
 	updatedPost, err := h.updateUsecase.Execute(c.Request.Context(), post.UpdatePostRequest{
-		ID:       req.ID,
+		ID:       id,
 		Title:    req.Title,
-		AuthorID: req.AuthorID,
+		AuthorID: userID,
 		Content:  req.Content,
+		ImageKey: req.ImageKey,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -101,13 +111,14 @@ func (h *PostHandler) Update(c *gin.Context) {
 			"title":    updatedPost.Title,
 			"authorId": updatedPost.AuthorID,
 			"content":  updatedPost.Content,
+			"imageKey": updatedPost.ImageKey,
 		},
 	})
 }
 
 func (h *PostHandler) Delete(c *gin.Context) {
-	var req DeletePostRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	id := c.Param("id")
+	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "invalid request",
 		})
@@ -115,7 +126,7 @@ func (h *PostHandler) Delete(c *gin.Context) {
 	}
 
 	err := h.deleteUsecase.Execute(c.Request.Context(), post.DeletePostRequest{
-		ID: req.ID,
+		ID: id,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{

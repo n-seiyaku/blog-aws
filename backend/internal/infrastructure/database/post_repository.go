@@ -16,12 +16,13 @@ type postItem struct {
 	FeedKey   string `dynamodbav:"feedKey"`
 	Title     string `dynamodbav:"title"`
 	Content   string `dynamodbav:"content"`
+	ImageKey  string `dynamodbav:"imageKey"`
 	AuthorID  string `dynamodbav:"authorId"`
 	CreatedAt string `dynamodbav:"createdAt"`
 	UpdatedAt string `dynamodbav:"updatedAt"`
 }
 
-const FeedKey = "POST"
+const FeedKeyPost = "POST"
 
 type PostRepository struct {
 	client    *dynamodb.Client
@@ -38,9 +39,10 @@ func NewPostRepository(client *dynamodb.Client, tableName string) *PostRepositor
 func (r *PostRepository) Create(ctx context.Context, p post.Post) error {
 	item := postItem{
 		ID:        p.ID,
-		FeedKey:   FeedKey,
+		FeedKey:   FeedKeyPost,
 		Title:     p.Title,
 		AuthorID:  p.AuthorID,
+		ImageKey:  p.ImageKey,
 		Content:   p.Content,
 		CreatedAt: p.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: p.UpdatedAt.Format(time.RFC3339),
@@ -69,10 +71,11 @@ func (r *PostRepository) Update(ctx context.Context, p post.Post) error {
 				Value: p.ID,
 			},
 		},
-		UpdateExpression: aws.String("SET #title = :title, #content = :content, #updatedAt = :updatedAt"),
+		UpdateExpression: aws.String("SET #title = :title, #content = :content, #imageKey = :imageKey, #updatedAt = :updatedAt"),
 		ExpressionAttributeNames: map[string]string{
 			"#title":     "title",
 			"#content":   "content",
+			"#imageKey":  "imageKey",
 			"#updatedAt": "updatedAt",
 		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
@@ -81,6 +84,9 @@ func (r *PostRepository) Update(ctx context.Context, p post.Post) error {
 			},
 			":content": &types.AttributeValueMemberS{
 				Value: p.Content,
+			},
+			":imageKey": &types.AttributeValueMemberS{
+				Value: p.ImageKey,
 			},
 			":updatedAt": &types.AttributeValueMemberS{
 				Value: p.UpdatedAt.Format(time.RFC3339),
@@ -103,10 +109,6 @@ func (r *PostRepository) Delete(ctx context.Context, id string) error {
 
 	return err
 }
-
-const (
-	FeedKeyPost = "POST"
-)
 
 func (r *PostRepository) ListPosts(ctx context.Context, limit int32, cursor string) ([]post.Post, string, error) {
 	lastKey, err := decodePostCursor(cursor)
@@ -171,6 +173,7 @@ func parsePostItem(item postItem) (post.Post, error) {
 		Title:     item.Title,
 		AuthorID:  item.AuthorID,
 		Content:   item.Content,
+		ImageKey:  item.ImageKey,
 		CreatedAt: createdAt,
 		UpdatedAt: updatedAt,
 	}, nil

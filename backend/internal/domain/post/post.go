@@ -5,8 +5,9 @@ import "time"
 type Post struct {
 	ID        string
 	Title     string
-	AuthorID  string
 	Content   string
+	ImageKey  string
+	AuthorID  string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

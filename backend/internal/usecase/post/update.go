@@ -11,6 +11,7 @@ type UpdatePostRequest struct {
 	Title    string
 	AuthorID string
 	Content  string
+	ImageKey string
 }
 
 type UpdatePostUsecase struct {
@@ -29,6 +30,7 @@ func (u *UpdatePostUsecase) Execute(ctx context.Context, req UpdatePostRequest) 
 		Title:     req.Title,
 		AuthorID:  req.AuthorID,
 		Content:   req.Content,
+		ImageKey:  req.ImageKey,
 		UpdatedAt: time.Now(),
 	}
 

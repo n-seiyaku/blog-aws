@@ -4,9 +4,11 @@ import (
 	"blog-aws-backend/internal/adapter/http/handler"
 	"blog-aws-backend/internal/adapter/http/middleware"
 	"blog-aws-backend/internal/infrastructure/database"
+	"blog-aws-backend/internal/infrastructure/storage"
 	"blog-aws-backend/internal/infrastructure/token"
 	"blog-aws-backend/internal/usecase/auth"
 	"blog-aws-backend/internal/usecase/post"
+	"blog-aws-backend/internal/usecase/upload"
 	"context"
 	"log"
 	"net/http"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -45,15 +48,23 @@ func main() {
 		log.Fatal("DYNAMODB_POSTS_TABLE is required")
 	}
 
-	// AWS config
-	cfg, err := config.LoadDefaultConfig(context.Background())
+	s3Bucket := os.Getenv("S3_POST_IMAGES_BUCKET")
+	if s3Bucket == "" {
+		log.Fatal("S3_POST_IMAGES_BUCKET is required")
+	}
 
+	// AWS config
+	awsCfg, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	s3Client := s3.NewFromConfig(awsCfg)
+	s3Presigner := s3.NewPresignClient(s3Client)
+	s3Storage := storage.NewS3Storage(s3Client, s3Presigner, s3Bucket)
+
 	// Infrastructure
-	dynamoClient := dynamodb.NewFromConfig(cfg)
+	dynamoClient := dynamodb.NewFromConfig(awsCfg)
 
 	userRepository := database.NewUserRepository(
 		dynamoClient,
@@ -77,30 +88,32 @@ func main() {
 	authMiddleware := middleware.NewAuthMiddleware(jwtGenerator)
 
 	// Usecases
+	// Auth usecases
 	loginUsecase := auth.NewLoginUsecase(
 		userRepository,
 		sessionRepository,
 		jwtGenerator,
 	)
-
 	registerUsecase := auth.NewRegisterUsecase(
 		userRepository,
 	)
-
 	logoutUsecase := auth.NewLogoutUsecase(
 		sessionRepository,
 	)
-
 	refreshUsecase := auth.NewRefreshUsecase(
 		userRepository,
 		sessionRepository,
 		jwtGenerator,
 	)
 
-	createPostUsecase := post.NewCreatePostUsecase(postRepository)
+	// Post usecases
+	createPostUsecase := post.NewCreatePostUsecase(postRepository, s3Storage)
 	listPostsUsecase := post.NewListPostsUsecase(postRepository)
 	deletePostUsecase := post.NewDeletePostUsecase(postRepository)
 	updatePostUsecase := post.NewUpdatePostUsecase(postRepository)
+
+	// Upload usecases
+	presignUploadUsecase := upload.NewPresignUploadUseCase(s3Storage)
 
 	// HTTP handler
 	authHandler := handler.NewAuthHandler(
@@ -117,6 +130,8 @@ func main() {
 		listPostsUsecase,
 	)
 
+	uploadHandler := handler.NewUploadHandler(presignUploadUsecase)
+
 	// Gin
 	router := gin.Default()
 
@@ -131,13 +146,14 @@ func main() {
 		}
 	}
 
-	protect := router.Group("/")
-	protect.Use(authMiddleware.Handle())
+	protected := router.Group("/")
+	protected.Use(authMiddleware.Handle())
 	{
-		protect.GET("/posts", postHandler.ListPosts)
-		protect.POST("/posts", postHandler.Create)
-		protect.PUT("/posts", postHandler.Update)
-		protect.DELETE("/posts", postHandler.Delete)
+		protected.GET("/posts", postHandler.ListPosts)
+		protected.POST("/posts", postHandler.Create)
+		protected.PUT("/posts/:id", postHandler.Update)
+		protected.DELETE("/posts/:id", postHandler.Delete)
+		protected.POST("/uploads/presign", uploadHandler.Presign)
 	}
 
 	router.GET("/health", func(ctx *gin.Context) {

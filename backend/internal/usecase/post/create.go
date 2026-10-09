@@ -12,15 +12,26 @@ type CreatePostRequest struct {
 	Title    string
 	AuthorID string
 	Content  string
+	ImageKey string
+}
+
+type PostImageStorage interface {
+	VerifyPostImage(
+		ctx context.Context,
+		userID string,
+		key string,
+	) error
 }
 
 type CreatePostUsecase struct {
 	postRepository post.Repository
+	imageStorage   PostImageStorage
 }
 
-func NewCreatePostUsecase(postRepository post.Repository) *CreatePostUsecase {
+func NewCreatePostUsecase(postRepository post.Repository, imageStorage PostImageStorage) *CreatePostUsecase {
 	return &CreatePostUsecase{
 		postRepository: postRepository,
+		imageStorage:   imageStorage,
 	}
 }
 
@@ -30,13 +41,26 @@ func (u *CreatePostUsecase) Execute(ctx context.Context, req CreatePostRequest) 
 		return post.Post{}, err
 	}
 
+	now := time.Now()
+
 	newPost := post.Post{
 		ID:        postID.String(),
 		Title:     req.Title,
 		AuthorID:  req.AuthorID,
 		Content:   req.Content,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		ImageKey:  req.ImageKey,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	if req.ImageKey != "" {
+		if err := u.imageStorage.VerifyPostImage(
+			ctx,
+			req.AuthorID,
+			req.ImageKey,
+		); err != nil {
+			return post.Post{}, err
+		}
 	}
 
 	if err := u.postRepository.Create(ctx, newPost); err != nil {

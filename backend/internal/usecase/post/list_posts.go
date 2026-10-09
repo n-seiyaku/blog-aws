@@ -10,13 +10,6 @@ const (
 	MaxLimit = 50
 )
 
-type ListPostsRequest struct {
-	ID       string
-	Title    string
-	AuthorID string
-	Content  string
-}
-
 type ListPostsUsecase struct {
 	postRepository post.Repository
 }
