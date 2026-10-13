@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,6 +20,16 @@ type UpdatePostRequest struct {
 	Title    string `json:"title" binding:"required"`
 	Content  string `json:"content" binding:"required"`
 	ImageKey string `json:"imageKey" binding:"required"`
+}
+
+type PostResponse struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	ImageKey  string `json:"imageKey"`
+	AuthorID  string `json:"authorId"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
 }
 
 type PostHandler struct {
@@ -54,7 +65,6 @@ func (h *PostHandler) Create(c *gin.Context) {
 		Content:  req.Content,
 		ImageKey: req.ImageKey,
 	})
-	fmt.Println("error ================================", err)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": "failed to create post",
@@ -62,14 +72,14 @@ func (h *PostHandler) Create(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"post": gin.H{
-			"id":       newPost.ID,
-			"title":    newPost.Title,
-			"authorId": newPost.AuthorID,
-			"content":  newPost.Content,
-			"imageKey": newPost.ImageKey,
-		},
+	c.JSON(http.StatusCreated, PostResponse{
+		ID:        newPost.ID,
+		Title:     newPost.Title,
+		Content:   newPost.Content,
+		ImageKey:  newPost.ImageKey,
+		AuthorID:  newPost.AuthorID,
+		CreatedAt: newPost.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: newPost.UpdatedAt.Format(time.RFC3339),
 	})
 }
 
@@ -98,6 +108,7 @@ func (h *PostHandler) Update(c *gin.Context) {
 		Content:  req.Content,
 		ImageKey: req.ImageKey,
 	})
+	fmt.Println("error ================================11", err)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": "failed to update post",
@@ -105,14 +116,14 @@ func (h *PostHandler) Update(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"post": gin.H{
-			"id":       updatedPost.ID,
-			"title":    updatedPost.Title,
-			"authorId": updatedPost.AuthorID,
-			"content":  updatedPost.Content,
-			"imageKey": updatedPost.ImageKey,
-		},
+	c.JSON(http.StatusOK, PostResponse{
+		ID:        updatedPost.ID,
+		Title:     updatedPost.Title,
+		Content:   updatedPost.Content,
+		ImageKey:  updatedPost.ImageKey,
+		AuthorID:  updatedPost.AuthorID,
+		CreatedAt: updatedPost.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: updatedPost.UpdatedAt.Format(time.RFC3339),
 	})
 }
 
@@ -162,8 +173,21 @@ func (h *PostHandler) ListPosts(c *gin.Context) {
 		return
 	}
 
+	postResponses := make([]PostResponse, len(posts))
+	for i, post := range posts {
+		postResponses[i] = PostResponse{
+			ID:        post.ID,
+			Title:     post.Title,
+			Content:   post.Content,
+			ImageKey:  post.ImageKey,
+			AuthorID:  post.AuthorID,
+			CreatedAt: post.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: post.UpdatedAt.Format(time.RFC3339),
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"posts":      posts,
+		"posts":      postResponses,
 		"nextCursor": nextCursor,
 	})
 }
