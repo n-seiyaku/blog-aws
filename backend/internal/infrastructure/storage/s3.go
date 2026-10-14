@@ -4,6 +4,7 @@ import (
 	"blog-aws-backend/internal/shared/image"
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -88,7 +89,12 @@ func (s *S3Storage) Delete(ctx context.Context, key string) error {
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
 	})
-	return err
+
+	if err != nil {
+		return fmt.Errorf("delete S3 object: %w", err)
+	}
+
+	return nil
 }
 
 func (s *S3Storage) VerifyPostImage(

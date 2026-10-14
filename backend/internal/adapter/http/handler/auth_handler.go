@@ -4,7 +4,6 @@ import (
 	"blog-aws-backend/internal/domain/user"
 	"blog-aws-backend/internal/usecase/auth"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 
@@ -151,7 +150,6 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 			RefreshToken: req.RefreshToken,
 		},
 	)
-	fmt.Println(err)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"message": "invalid refresh token",
@@ -181,7 +179,6 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 			RefreshToken: req.RefreshToken,
 		},
 	)
-	fmt.Println(err)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "failed to logout",

@@ -110,7 +110,7 @@ func main() {
 	createPostUsecase := post.NewCreatePostUsecase(postRepository, s3Storage)
 	listPostsUsecase := post.NewListPostsUsecase(postRepository)
 	deletePostUsecase := post.NewDeletePostUsecase(postRepository)
-	updatePostUsecase := post.NewUpdatePostUsecase(postRepository)
+	updatePostUsecase := post.NewUpdatePostUsecase(postRepository, s3Storage)
 
 	// Upload usecases
 	presignUploadUsecase := upload.NewPresignUploadUseCase(s3Storage)

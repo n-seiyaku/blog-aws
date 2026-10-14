@@ -3,7 +3,6 @@ package handler
 import (
 	"blog-aws-backend/internal/usecase/upload"
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +36,6 @@ func (h *UploadHandler) Presign(c *gin.Context) {
 		return
 	}
 
-	fmt.Println("userId =======================================", c.GetString("userID"))
 	res, err := h.presign.Execute(c.Request.Context(), upload.PresignUploadRequest{
 		UserID:      c.GetString("userID"),
 		ContentType: req.ContentType,

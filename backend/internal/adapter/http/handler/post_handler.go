@@ -2,7 +2,6 @@ package handler
 
 import (
 	"blog-aws-backend/internal/usecase/post"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -13,13 +12,13 @@ import (
 type CreatePostRequest struct {
 	Title    string `json:"title" binding:"required"`
 	Content  string `json:"content" binding:"required"`
-	ImageKey string `json:"imageKey" binding:"required"`
+	ImageKey string `json:"imageKey"`
 }
 
 type UpdatePostRequest struct {
-	Title    string `json:"title" binding:"required"`
-	Content  string `json:"content" binding:"required"`
-	ImageKey string `json:"imageKey" binding:"required"`
+	Title    string  `json:"title" binding:"required"`
+	Content  string  `json:"content" binding:"required"`
+	ImageKey *string `json:"imageKey"`
 }
 
 type PostResponse struct {
@@ -39,7 +38,12 @@ type PostHandler struct {
 	listPostsUsecase *post.ListPostsUsecase
 }
 
-func NewPostHandler(createUsecase *post.CreatePostUsecase, updateUsecase *post.UpdatePostUsecase, deleteUsecase *post.DeletePostUsecase, listPostsUsecase *post.ListPostsUsecase) *PostHandler {
+func NewPostHandler(
+	createUsecase *post.CreatePostUsecase,
+	updateUsecase *post.UpdatePostUsecase,
+	deleteUsecase *post.DeletePostUsecase,
+	listPostsUsecase *post.ListPostsUsecase,
+) *PostHandler {
 	return &PostHandler{
 		createUsecase:    createUsecase,
 		updateUsecase:    updateUsecase,
@@ -76,51 +80,43 @@ func (h *PostHandler) Create(c *gin.Context) {
 		ID:        newPost.ID,
 		Title:     newPost.Title,
 		Content:   newPost.Content,
-		ImageKey:  newPost.ImageKey,
+		ImageKey:  *newPost.ImageKey,
 		AuthorID:  newPost.AuthorID,
 		CreatedAt: newPost.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: newPost.UpdatedAt.Format(time.RFC3339),
 	})
 }
 
-func (h *PostHandler) Update(c *gin.Context) {
+func (h *PostHandler) Update(ctx *gin.Context) {
 	var req UpdatePostRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "invalid request",
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
 		})
 		return
 	}
 
-	id := c.Param("id")
-	if id == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "invalid request",
-		})
-		return
-	}
-
-	userID := c.GetString("userID")
-	updatedPost, err := h.updateUsecase.Execute(c.Request.Context(), post.UpdatePostRequest{
-		ID:       id,
+	updatedPost, err := h.updateUsecase.Execute(ctx.Request.Context(), post.UpdatePostRequest{
+		ID:       ctx.Param("id"),
 		Title:    req.Title,
-		AuthorID: userID,
+		AuthorID: ctx.GetString("userID"),
 		Content:  req.Content,
 		ImageKey: req.ImageKey,
 	})
-	fmt.Println("error ================================11", err)
+
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": "failed to update post",
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, PostResponse{
+	ctx.JSON(http.StatusOK, PostResponse{
 		ID:        updatedPost.ID,
 		Title:     updatedPost.Title,
 		Content:   updatedPost.Content,
-		ImageKey:  updatedPost.ImageKey,
+		ImageKey:  *updatedPost.ImageKey,
 		AuthorID:  updatedPost.AuthorID,
 		CreatedAt: updatedPost.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: updatedPost.UpdatedAt.Format(time.RFC3339),
@@ -179,7 +175,7 @@ func (h *PostHandler) ListPosts(c *gin.Context) {
 			ID:        post.ID,
 			Title:     post.Title,
 			Content:   post.Content,
-			ImageKey:  post.ImageKey,
+			ImageKey:  *post.ImageKey,
 			AuthorID:  post.AuthorID,
 			CreatedAt: post.CreatedAt.Format(time.RFC3339),
 			UpdatedAt: post.UpdatedAt.Format(time.RFC3339),

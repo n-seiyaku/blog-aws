@@ -3,6 +3,8 @@ package database
 import (
 	"blog-aws-backend/internal/domain/post"
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -16,7 +18,7 @@ type postItem struct {
 	FeedKey   string `dynamodbav:"feedKey"`
 	Title     string `dynamodbav:"title"`
 	Content   string `dynamodbav:"content"`
-	ImageKey  string `dynamodbav:"imageKey"`
+	ImageKey  string `dynamodbav:"imageKey,omitempty"`
 	AuthorID  string `dynamodbav:"authorId"`
 	CreatedAt string `dynamodbav:"createdAt"`
 	UpdatedAt string `dynamodbav:"updatedAt"`
@@ -42,7 +44,7 @@ func (r *PostRepository) Create(ctx context.Context, p post.Post) error {
 		FeedKey:   FeedKeyPost,
 		Title:     p.Title,
 		AuthorID:  p.AuthorID,
-		ImageKey:  p.ImageKey,
+		ImageKey:  *p.ImageKey,
 		Content:   p.Content,
 		CreatedAt: p.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: p.UpdatedAt.Format(time.RFC3339),
@@ -63,16 +65,25 @@ func (r *PostRepository) Create(ctx context.Context, p post.Post) error {
 	return err
 }
 
-func (r *PostRepository) Update(ctx context.Context, p post.Post) error {
+func (r *PostRepository) Update(ctx context.Context, p post.Post, expectedImageKey string) error {
+	condition := "attribute_exists(#id) AND #authorId = :authorId AND #imageKey = :oldImageKey"
+
+	if expectedImageKey == "" {
+		condition = "attribute_exists(#id) AND #authorId = :authorId AND (#imageKey = :oldImageKey OR attribute_not_exists(#imageKey))"
+	}
+
 	_, err := r.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: &r.tableName,
+		TableName: aws.String(r.tableName),
 		Key: map[string]types.AttributeValue{
 			"id": &types.AttributeValueMemberS{
 				Value: p.ID,
 			},
 		},
-		UpdateExpression: aws.String("SET #title = :title, #content = :content, #imageKey = :imageKey, #updatedAt = :updatedAt"),
+		UpdateExpression:    aws.String("SET #title = :title, #content = :content, #imageKey = :imageKey, #updatedAt = :updatedAt"),
+		ConditionExpression: aws.String(condition),
 		ExpressionAttributeNames: map[string]string{
+			"#id":        "id",
+			"#authorId":  "authorId",
 			"#title":     "title",
 			"#content":   "content",
 			"#imageKey":  "imageKey",
@@ -86,15 +97,30 @@ func (r *PostRepository) Update(ctx context.Context, p post.Post) error {
 				Value: p.Content,
 			},
 			":imageKey": &types.AttributeValueMemberS{
-				Value: p.ImageKey,
+				Value: *p.ImageKey,
 			},
 			":updatedAt": &types.AttributeValueMemberS{
 				Value: p.UpdatedAt.Format(time.RFC3339),
 			},
+			":authorId": &types.AttributeValueMemberS{
+				Value: p.AuthorID,
+			},
+			":oldImageKey": &types.AttributeValueMemberS{
+				Value: expectedImageKey,
+			},
 		},
-		ConditionExpression: aws.String("attribute_exists(id)"),
 	})
-	return err
+	if err != nil {
+		var conditionalErr *types.ConditionalCheckFailedException
+
+		if errors.As(err, &conditionalErr) {
+			return post.ErrConflict
+		}
+
+		return fmt.Errorf("update post: %w", err)
+	}
+
+	return nil
 }
 
 func (r *PostRepository) Delete(ctx context.Context, id string) error {
@@ -157,6 +183,32 @@ func (r *PostRepository) ListPosts(ctx context.Context, limit int32, cursor stri
 	return posts, nextCursor, nil
 }
 
+func (r *PostRepository) FindById(ctx context.Context, id string) (post.Post, error) {
+	output, err := r.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(r.tableName),
+		Key: map[string]types.AttributeValue{
+			"id": &types.AttributeValueMemberS{
+				Value: id,
+			},
+		},
+		ConsistentRead: aws.Bool(true),
+	})
+	if err != nil {
+		return post.Post{}, err
+	}
+
+	if len(output.Item) == 0 {
+		return post.Post{}, post.ErrNotFound
+	}
+
+	var p postItem
+	if err := attributevalue.UnmarshalMap(output.Item, &p); err != nil {
+		return post.Post{}, err
+	}
+
+	return parsePostItem(p)
+}
+
 func parsePostItem(item postItem) (post.Post, error) {
 	createdAt, err := time.Parse(time.RFC3339, item.CreatedAt)
 	if err != nil {
@@ -173,7 +225,7 @@ func parsePostItem(item postItem) (post.Post, error) {
 		Title:     item.Title,
 		AuthorID:  item.AuthorID,
 		Content:   item.Content,
-		ImageKey:  item.ImageKey,
+		ImageKey:  &item.ImageKey,
 		CreatedAt: createdAt,
 		UpdatedAt: updatedAt,
 	}, nil
