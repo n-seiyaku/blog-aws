@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../../auth";
 import { useNavigate } from "react-router";
+import { Button, TextField } from "@mui/material";
 
 function Login() {
   const [username, setUsername] = useState("");
@@ -18,24 +19,29 @@ function Login() {
     // setPassword("");
   };
   return (
-    <div>
-      <label htmlFor="username">Username</label>
-      <input
-        type="text"
+    <div className="flex flex-col gap-4 w-full max-w-sm px-6">
+      <div className="text-center text-lg font-semibold">My Blog</div>
+
+      <TextField
         id="username"
+        label="Username"
+        variant="outlined"
         value={username}
         onChange={(e) => setUsername(e.target.value)}
       />
-      <br />
-      <label htmlFor="password">Password</label>
-      <input
-        type="password"
+
+      <TextField
         id="password"
+        label="Password"
+        variant="outlined"
+        type="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
       />
-      <br />
-      <button onClick={handleSubmit}>Login</button>
+
+      <Button variant="contained" onClick={handleSubmit}>
+        Login
+      </Button>
     </div>
   );
 }
