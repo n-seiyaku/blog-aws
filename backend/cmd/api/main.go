@@ -135,6 +135,8 @@ func main() {
 	// Gin
 	router := gin.Default()
 
+	router.Use(middleware.CORS())
+
 	api := router.Group("/api")
 	{
 		auth := api.Group("auth")
