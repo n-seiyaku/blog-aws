@@ -1,23 +1,12 @@
 import { useState } from "react";
 import { useAuth } from "../../auth";
-import { useNavigate } from "react-router";
 import { Button, TextField } from "@mui/material";
 
 function Login() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { user, handleLogin } = useAuth();
-  const navigate = useNavigate();
+  const { handleLogin } = useAuth();
 
-  const handleSubmit = async () => {
-    await handleLogin({ email: username, password });
-    if (user) {
-      navigate("/blog");
-    }
-
-    // setUsername("");
-    // setPassword("");
-  };
   return (
     <div className="flex flex-col gap-4 w-full max-w-sm px-6">
       <div className="text-center text-lg font-semibold">My Blog</div>
@@ -26,8 +15,8 @@ function Login() {
         id="username"
         label="Username"
         variant="outlined"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
       />
 
       <TextField
@@ -39,7 +28,10 @@ function Login() {
         onChange={(e) => setPassword(e.target.value)}
       />
 
-      <Button variant="contained" onClick={handleSubmit}>
+      <Button
+        variant="contained"
+        onClick={() => handleLogin({ email, password })}
+      >
         Login
       </Button>
     </div>
